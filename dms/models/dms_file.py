@@ -30,6 +30,7 @@ class File(models.Model):
         "dms.mixins.thumbnail",
         "mail.thread",
         "mail.activity.mixin",
+        "abstract.dms.mixin",
     ]
 
     _order = "name asc"
@@ -37,8 +38,6 @@ class File(models.Model):
     # ----------------------------------------------------------
     # Database
     # ----------------------------------------------------------
-
-    name = fields.Char(string="Filename", required=True, index=True)
 
     active = fields.Boolean(
         string="Archived",
@@ -56,7 +55,7 @@ class File(models.Model):
         required=True,
         index=True,
     )
-
+    # Override acording to defined in AbstractDmsMixin
     storage_id = fields.Many2one(
         related="directory_id.storage_id",
         comodel_name="dms.storage",
@@ -66,33 +65,12 @@ class File(models.Model):
         store=True,
     )
 
-    is_hidden = fields.Boolean(
-        string="Storage is Hidden", related="storage_id.is_hidden", readonly=True
-    )
-
-    company_id = fields.Many2one(
-        related="storage_id.company_id",
-        comodel_name="res.company",
-        string="Company",
-        readonly=True,
-        store=True,
-        index=True,
-    )
-
     path_names = fields.Char(
         compute="_compute_path", string="Path Names", readonly=True, store=False
     )
 
     path_json = fields.Text(
         compute="_compute_path", string="Path Json", readonly=True, store=False
-    )
-
-    color = fields.Integer(string="Color", default=0)
-
-    category_id = fields.Many2one(
-        comodel_name="dms.category",
-        context="{'dms_category_show_path': True}",
-        string="Category",
     )
 
     tag_ids = fields.Many2many(
@@ -184,23 +162,7 @@ class File(models.Model):
         invisible=True,
         ondelete="cascade",
     )
-    res_model = fields.Char(string="Linked attachments model")
-    res_id = fields.Integer(string="Linked attachments record ID")
-    record_ref = fields.Reference(
-        string="Record Referenced",
-        compute="_compute_record_ref",
-        selection=[],
-        readonly=True,
-        store=False,
-    )
     storage_id_save_type = fields.Selection(related="storage_id.save_type", store=False)
-
-    @api.depends("res_model", "res_id")
-    def _compute_record_ref(self):
-        for record in self:
-            record.record_ref = False
-            if record.res_model and record.res_id:
-                record.record_ref = "{},{}".format(record.res_model, record.res_id)
 
     def get_human_size(self):
         return human_size(self.size)
@@ -408,13 +370,10 @@ class File(models.Model):
         for record in self:
             record.extension = file.guess_extension(record.name)
 
-    @api.depends("name", "content")
+    @api.depends("content")
     def _compute_mimetype(self):
         for record in self:
-            binary = base64.b64decode(record.with_context({}).content or "")
-            record.res_mimetype = guess_mimetype(
-                binary, default="application/octet-stream"
-            )
+            record.res_mimetype = guess_mimetype(record.content or b"")
 
     @api.depends("content_binary", "content_file", "attachment_id")
     def _compute_content(self):
@@ -638,8 +597,9 @@ class File(models.Model):
 
     def _create_model_attachment(self, vals):
         res_vals = vals.copy()
-        directory = self.env["dms.directory"].sudo().browse(res_vals["directory_id"])
-        if directory and directory.res_model and directory.res_id:
+        directory_id = res_vals.get("directory_id", self.env.context.get("active_id"))
+        directory = self.env["dms.directory"].browse(directory_id)
+        if directory.res_model and directory.res_id:
             attachment = (
                 self.env["ir.attachment"]
                 .with_context(dms_file=True)

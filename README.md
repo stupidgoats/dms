@@ -5,9 +5,9 @@
 
 <!-- /!\ do not modify above this line -->
 
-# dms
+# Document Management System modules for Odoo
 
-TODO: add repo description.
+OCA modules for DMS
 
 <!-- /!\ do not modify below this line -->
 
@@ -15,7 +15,11 @@ TODO: add repo description.
 
 [//]: # (addons)
 
-This part will be replaced when running the oca-gen-addons-table script from OCA/maintainer-tools.
+Available addons
+----------------
+addon | version | maintainers | summary
+--- | --- | --- | ---
+[dms](dms/) | 14.0.4.0.1 |  | Document Management System for Odoo
 
 [//]: # (end addons)
 

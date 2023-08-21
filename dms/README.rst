@@ -47,6 +47,9 @@ Preview
 the other `mail_preview` modules from `social` OCA repository
 in order to improve the preview of files.
 
+`python-magic` library is recommended to be installed for having whole support
+to get proper file types and file preview.
+
 Configuration
 =============
 
@@ -79,6 +82,13 @@ In order to achieve it you need to:
 You can check all the files that still needs to be migrated from all storages
 and migrate them manually on *Documents -> Configuration -> Migration*
 
+
+File Wizard Selection
+~~~~~~~~~~~~~~~~~~~~~
+
+There is an action called `action_dms_file_wizard_selector` to open a wizard to list files in kanban view.
+This can be used (example `dms_attachment_link` module) to add a button in kanban view with the action we need.
+
 Usage
 =====
 
@@ -99,6 +109,8 @@ Known issues / Roadmap
 - Save in cache own_root directories and update in every create/write/unlink function
 - Add a migration procedure for converting an storage to attachment one for populating existing records with attachments as folders
 - Add a link from attachment view in chatter to linked documents
+- If Inherit permissions from related record (the inherit_access_from_parent_record field from storage) is changed when directories already exist, inconsistencies may occur because groups defined in the directories and subdirectories will still exist, all groups in these directories should be removed before changing.
+- Since portal users can read ``dms.storage`` records, if your module extends this model to another storage backend that needs using secrets, remember to forbid access to the secrets fields by other means. It would be nice to be able to remove that rule at some point.
 
 Bug Tracker
 ===========
@@ -131,6 +143,7 @@ Contributors
 
   * Víctor Martínez
   * Pedro M. Baeza
+  * Jairo Llopis
 
 Other credits
 ~~~~~~~~~~~~~

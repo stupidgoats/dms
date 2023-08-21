@@ -1,6 +1,11 @@
 # Copyright 2017-2019 MuK IT GmbH.
 # Copyright 2020 Creu Blanca
+# Copyright 2021-2022 Tecnativa - Víctor Martínez
 # License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl).
+
+from odoo.exceptions import UserError
+
+from odoo.addons.web.models.models import SEARCH_PANEL_LIMIT
 
 from .common import DocumentsBaseCase, multi_users
 
@@ -59,18 +64,16 @@ class DirectoryTestCase(DocumentsBaseCase):
 
     @multi_users(lambda self: self.multi_users(), callback="_setup_test_data")
     def test_move_directory(self):
-        path_names = self.directory_sub_demo_01.complete_name
-        self.directory_root_demo_01.write(
-            {
-                "root_storage_id": False,
-                "is_root_directory": False,
-                "parent_id": self.directory_root_demo_02.id,
-            }
-        )
-        self.assertNotEqual(path_names, self.directory_sub_demo_01.complete_name)
+        with self.assertRaises(UserError):
+            self.directory_root_demo_01.write(
+                {
+                    "is_root_directory": False,
+                    "parent_id": self.directory_root_demo_02.id,
+                }
+            )
 
     @multi_users(lambda self: self.multi_users(), callback="_setup_test_data")
-    def test_unlink_directory(self):
+    def test_unlink_root_directory(self):
         root_directory = self.create_directory(storage=self.new_storage)
         sub_directory = self.create_directory(directory=root_directory)
         sub_files = self.create_file(directory=sub_directory)
@@ -79,13 +82,22 @@ class DirectoryTestCase(DocumentsBaseCase):
         self.assertFalse(sub_files.exists())
 
     @multi_users(lambda self: self.multi_users(), callback="_setup_test_data")
+    def test_unlink_directory(self):
+        root_directory = self.create_directory(storage=self.new_storage)
+        sub_directory = self.create_directory(directory=root_directory)
+        sub_files = self.create_file(directory=sub_directory)
+        sub_directory.unlink()
+        self.assertTrue(root_directory.exists())
+        self.assertFalse(sub_files.exists())
+
+    @multi_users(lambda self: self.multi_users(), callback="_setup_test_data")
     def test_storage(self):
         new_storage = self.create_storage(sudo=True)
         root_directory = self.create_directory(storage=self.new_storage)
         sub_directory = self.create_directory(directory=root_directory)
         self.assertEqual(sub_directory.storage_id.id, self.new_storage.id)
-        root_directory.write({"root_storage_id": new_storage.id})
-        self.assertEqual(sub_directory.storage_id.id, new_storage.id)
+        with self.assertRaises(UserError):
+            root_directory.write({"storage_id": new_storage.id})
 
     @multi_users(lambda self: self.multi_users(), callback="_setup_test_data")
     def test_starred(self):
@@ -142,3 +154,19 @@ class DirectoryTestCase(DocumentsBaseCase):
         self.assertTrue(self.directory.search_panel_select_multi_range("parent_id"))
         self.assertTrue(self.directory.search_panel_select_multi_range("category_id"))
         self.assertTrue(self.directory.search_panel_select_multi_range("tag_ids"))
+
+    def test_directory_search_panel_limit(self):
+        self.directory_sub_demo_01 = self.browse_ref("dms.directory_04_demo")
+        limit = SEARCH_PANEL_LIMIT + 20
+        for number in range(limit):
+            self.directory.sudo().create(
+                {
+                    "name": "Test Directory %s" % str(number),
+                    "parent_id": self.directory_sub_demo_01.parent_id.id,
+                    "storage_id": self.directory_sub_demo_01.storage_id.id,
+                }
+            )
+        res = self.directory.search_panel_select_range("parent_id")
+        self.assertGreaterEqual(len(res["values"]), limit)
+        res = self.file.search_panel_select_range("directory_id")
+        self.assertGreaterEqual(len(res["values"]), limit)

@@ -6,18 +6,6 @@
 
   -->
 <templates xml:space="preserve">
-    <t t-name="dms.drop_overlay">
-        <div class="o_drag_over">
-            <div class="o_drag_over_content">
-                <div>
-                    <i class="fa fa-file-o fa-5x" aria-hidden="true" />
-                </div>
-                <div>
-                    <h2>Drop your files here</h2>
-                </div>
-            </div>
-        </div>
-    </t>
     <t t-name="FieldBinaryPreview.Content" t-extend="DocumentViewer.Content">
         <!-- We need to replace in order to change all the called options,
             the new item will contain the same elements than the original one
@@ -79,6 +67,11 @@
                 class="o_document_viewer_content_call"
                 t-call="FieldBinaryPreview.Content"
             />
+        </t>
+    </t>
+    <t t-extend="SearchPanel.CategoryValues">
+        <t t-jquery=".o_search_panel_label" t-operation="attributes">
+            <attribute name="t-att-title">value.display_name</attribute>
         </t>
     </t>
 </templates>

@@ -71,8 +71,8 @@
                     <field
                         name="directory_id"
                         icon="fa-folder"
-                        context="{'directory_short_name': True}"
                         enable_counters="1"
+                        operator="="
                     />
                     <field name="category_id" icon="fa-users" enable_counters="1" />
                 </searchpanel>
@@ -240,11 +240,6 @@
                                         <div
                                             class="o_kanban_record_title o_text_overflow"
                                         >
-                                            <a
-                                                class="o_kanban_dms_file_preview fa fa-search"
-                                                title="Search"
-                                                t-att-data-id="widget.db_id"
-                                            />
                                             <field name="name" />
                                         </div>
                                         <div class="o_kanban_record_body">
@@ -287,6 +282,24 @@
             </kanban>
         </field>
     </record>
+    <!-- Base view that can be overwritten by other modules as needed !-->
+    <record id="view_dms_file_kanban_wizard_selection" model="ir.ui.view">
+        <field name="name">dms_file.kanban.wizard.selection</field>
+        <field name="model">dms.file</field>
+        <field name="inherit_id" ref="dms.view_dms_file_kanban" />
+        <field name="priority">9999</field>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <kanban position="attributes">
+                <attribute name="banner_route" />
+                <attribute name="class">o_kanban_mobile</attribute>
+            </kanban>
+            <xpath expr="//div[hasclass('o_dropdown_kanban')]" position="replace" />
+            <xpath expr="//div[hasclass('oe_kanban_bottom_right')]" position="replace">
+                <div class="oe_kanban_bottom_right" />
+            </xpath>
+        </field>
+    </record>
     <record id="view_dms_file_tree" model="ir.ui.view">
         <field name="name">dms_file.tree</field>
         <field name="model">dms.file</field>
@@ -296,15 +309,20 @@
                 js_class="file_list"
                 decoration-warning="not active"
                 decoration-muted="(is_locked and not is_lock_editor)"
+                multi_edit="1"
             >
                 <field name="active" invisible="1" />
                 <field name="is_locked" invisible="1" />
                 <field name="is_lock_editor" invisible="1" />
                 <field name="name" />
                 <field name="write_date" />
-                <field name="size" />
+                <field name="size" widget="integer" />
                 <field name="mimetype" />
-                <field name="path_names" widget="path_names" string="Path" />
+                <field
+                    name="tag_ids"
+                    widget="many2many_tags"
+                    options="{'color_field': 'color', 'no_create_edit': True}"
+                />
             </tree>
         </field>
     </record>
@@ -357,6 +375,12 @@
                     />
                 </header>
                 <sheet>
+                    <widget
+                        name="web_ribbon"
+                        title="Archived"
+                        bg_color="bg-danger"
+                        attrs="{'invisible': [('active', '=', True)]}"
+                    />
                     <div class="oe_button_box" name="button_box" />
                     <field
                         name="image_1920"
@@ -385,6 +409,7 @@
                             <field
                                 name="content"
                                 filename="name"
+                                mimetype="mimetype"
                                 widget="preview_binary"
                             />
                         </group>
@@ -506,6 +531,18 @@
             </p>
         </field>
     </record>
+    <!-- Base action to be called when a file selector is to be used !-->
+    <record id="action_dms_file_wizard_selector" model="ir.actions.act_window">
+        <field name="name">Files</field>
+        <field name="res_model">dms.file</field>
+        <field name="target">new</field>
+        <field name="view_mode">kanban</field>
+        <field name="context">{'create': False}</field>
+        <field
+            name="view_ids"
+            eval="[(5, 0, 0),(0, 0, {'view_mode': 'kanban', 'view_id': ref('view_dms_file_kanban_wizard_selection')})]"
+        />
+    </record>
     <menuitem
         id="menu_dms_file"
         name="Files"
@@ -528,7 +565,12 @@
                     />
                 </group>
                 <searchpanel>
-                    <field name="directory_id" icon="fa-folder" enable_counters="1" />
+                    <field
+                        name="directory_id"
+                        icon="fa-folder"
+                        enable_counters="1"
+                        operator="="
+                    />
                     <field name="category_id" icon="fa-users" enable_counters="1" />
                 </searchpanel>
             </search>
@@ -548,7 +590,7 @@
                 <field name="is_lock_editor" invisible="1" />
                 <field name="name" />
                 <field name="write_date" />
-                <field name="content" />
+                <field name="size" widget="integer" />
                 <field name="mimetype" />
                 <field name="storage_id" />
                 <field name="migration" />

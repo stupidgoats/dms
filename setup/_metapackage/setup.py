@@ -9,9 +9,12 @@ setuptools.setup(
     version=version,
     install_requires=[
         'odoo14-addon-dms',
+        'odoo14-addon-dms_action',
+        'odoo14-addon-dms_field',
     ],
     classifiers=[
         'Programming Language :: Python',
         'Framework :: Odoo',
+        'Framework :: Odoo :: 14.0',
     ]
 )

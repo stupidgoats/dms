@@ -9,6 +9,8 @@ import json
 import logging
 from collections import defaultdict
 
+from PIL import Image
+
 from odoo import _, api, fields, models, tools
 from odoo.exceptions import ValidationError
 from odoo.osv import expression
@@ -107,7 +109,7 @@ class File(models.Model):
         compute="_compute_mimetype", string="Type", readonly=True, store=True
     )
 
-    size = fields.Integer(string="Size", readonly=True)
+    size = fields.Float(string="Size", readonly=True)
 
     checksum = fields.Char(string="Checksum/SHA1", readonly=True, index=True)
 
@@ -144,7 +146,15 @@ class File(models.Model):
     def _compute_image_1920(self):
         """Provide thumbnail automatically if possible."""
         for one in self.filtered("mimetype"):
-            if one.mimetype.startswith("image/"):
+            # Image.MIME provides a dict of mimetypes supported by Pillow,
+            # SVG is not present in the dict but is also a supported image format
+            # lacking a better solution, it's being added manually
+            # Some component modifies the PIL dictionary by adding PDF as a valid
+            # image type, so it must be explicitly excluded.
+            if one.mimetype != "application/pdf" and one.mimetype in (
+                *Image.MIME.values(),
+                "image/svg+xml",
+            ):
                 one.image_1920 = one.content
 
     def check_access_rule(self, operation):
@@ -376,10 +386,12 @@ class File(models.Model):
                 }
             )
 
-    @api.depends("name")
+    @api.depends("name", "mimetype", "content")
     def _compute_extension(self):
         for record in self:
-            record.extension = file.guess_extension(record.name)
+            record.extension = file.guess_extension(
+                record.name, record.mimetype, record.content
+            )
 
     @api.depends("content")
     def _compute_mimetype(self):
@@ -508,7 +520,11 @@ class File(models.Model):
         elif self.env.context.get("default_directory_id"):
             directory_id = self.env.context.get("default_directory_id")
         directory = self.env["dms.directory"].browse(directory_id)
-        if directory.res_model and directory.res_id:
+        if (
+            directory.res_model
+            and directory.res_id
+            and directory.storage_id_save_type == "attachment"
+        ):
             attachment = (
                 self.env["ir.attachment"]
                 .with_context(dms_file=True)

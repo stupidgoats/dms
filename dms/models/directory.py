@@ -184,7 +184,7 @@ class DmsDirectory(models.Model):
         compute="_compute_count_total_elements", string="Total Elements"
     )
 
-    size = fields.Integer(compute="_compute_size", string="Size")
+    size = fields.Float(compute="_compute_size", string="Size")
 
     inherit_group_ids = fields.Boolean(string="Inherit Groups", default=True)
 
@@ -261,7 +261,15 @@ class DmsDirectory(models.Model):
         current_directory = self
         while current_directory:
             directories.insert(0, current_directory)
-            if access_token and consteq(current_directory.access_token, access_token):
+            if (
+                (
+                    access_token
+                    and current_directory.access_token
+                    and consteq(current_directory.access_token, access_token)
+                )
+                or not access_token
+                and current_directory.check_access_rights("read")
+            ):
                 return directories
             current_directory = current_directory.parent_id
         if access_token:
@@ -270,11 +278,15 @@ class DmsDirectory(models.Model):
         return directories
 
     def _get_own_root_directories(self):
-        return (
-            self.env["dms.directory"]
-            .search([("is_hidden", "=", False), ("parent_id", "=", False)])
-            .ids
+        res = self.env["dms.directory"].search_read(
+            [("is_hidden", "=", False)], ["parent_id"]
         )
+        all_ids = [value["id"] for value in res]
+        res_ids = []
+        for item in res:
+            if not item["parent_id"] or item["parent_id"][0] not in all_ids:
+                res_ids.append(item["id"])
+        return res_ids
 
     allowed_model_ids = fields.Many2many(
         related="storage_id.model_ids",
@@ -413,15 +425,19 @@ class DmsDirectory(models.Model):
 
     def _compute_count_total_directories(self):
         for record in self:
-            count = self.search_count([("id", "child_of", record.id)])
-            count = count - 1 if count > 0 else 0
-            record.count_total_directories = count
+            count = (
+                self.search_count([("id", "child_of", record.id)]) if record.id else 0
+            )
+            record.count_total_directories = count - 1 if count > 0 else 0
 
     def _compute_count_total_files(self):
         model = self.env["dms.file"]
         for record in self:
-            record.count_total_files = model.search_count(
-                [("directory_id", "child_of", record.id)]
+            # Prevent error in some NewId cases
+            record.count_total_files = (
+                model.search_count([("directory_id", "child_of", record.id)])
+                if record.id
+                else 0
             )
 
     def _compute_count_total_elements(self):
@@ -678,3 +694,26 @@ class DmsDirectory(models.Model):
         if self.child_directory_ids:
             self.child_directory_ids.unlink()
         return super().unlink()
+
+    @api.model
+    def _search_panel_domain_image(
+        self, field_name, domain, set_count=False, limit=False
+    ):
+        """We need to overwrite function from directories because odoo only return
+        records with childs (very weird for user perspective).
+        All records are returned now.
+        """
+        if field_name == "parent_id":
+            res = {}
+            for item in self.search_read(
+                domain=domain, fields=["id", "name", "count_directories"]
+            ):
+                res[item["id"]] = {
+                    "id": item["id"],
+                    "display_name": item["name"],
+                    "__count": item["count_directories"],
+                }
+            return res
+        return super()._search_panel_domain_image(
+            field_name=field_name, domain=domain, set_count=set_count, limit=limit
+        )
